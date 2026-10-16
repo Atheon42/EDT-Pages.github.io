@@ -1,0 +1,34 @@
+name: Atheon WeChat reader url-md one-time probe
+on:
+  push:
+    branches: [test/wechat-reader-network-20261016]
+    paths: ['.github/workflows/wechat-urlmd-probe.yml']
+permissions:
+  contents: read
+jobs:
+  test-open-source-parser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Test pinned url-md binary (no secrets, no publication)
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL --max-time 20 'https://github.com/Bwkyd/url-md/releases/download/v0.2.0/url-md-x86_64-unknown-linux-gnu.tar.gz' -o /tmp/reader.tgz
+          echo 'cc2cf64ce4b6a9d832c822ff29280f252eb2892bd8cefe04ec0b52374b86c2b2  /tmp/reader.tgz' | sha256sum -c -
+          mkdir -p /tmp/urlmd
+          tar -xzf /tmp/reader.tgz -C /tmp/urlmd
+          BIN=$(find /tmp/urlmd -type f -name url-md | head -1)
+          if [ -z "$BIN" ]; then echo "BINARY_MISSING"; exit 1; fi
+          chmod +x "$BIN"
+          "$BIN" --version || true
+          set +e
+          timeout 40 "$BIN" 'https://mp.weixin.qq.com/s/xj_nxuvM5l05D4uCLpCvRQ' > /tmp/output.md 2>/tmp/error.log
+          ec=$?
+          set -e
+          echo "TOOL_EXIT_CODE=$ec"
+          echo "MARKDOWN_BYTES=$(wc -c < /tmp/output.md)"
+          echo "TITLE_FOUND=$(grep -qc '中国人民银行行长潘功胜' /tmp/output.md && echo yes || echo no)"
+          echo "IMAGE_REFS=$(grep -c '!\\[' /tmp/output.md || true)"
+          echo "ERR_SNIPPET=$(head -c 400 /tmp/error.log | tr '\\n' ' ')"
+          if [ "$ec" = 0 ] && grep -q '中国人民银行行长潘功胜' /tmp/output.md; then echo "ACTUAL_ARTICLE_READ=YES"; else echo "ACTUAL_ARTICLE_READ=NO"; fi
