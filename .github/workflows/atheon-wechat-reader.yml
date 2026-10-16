@@ -1,0 +1,41 @@
+name: Atheon WeChat Reader
+on:
+  push:
+    branches: [atheon-wechat-reader]
+    paths:
+      - wechat-reader/request.json
+
+permissions:
+  contents: read
+
+jobs:
+  fetch-public-wechat-article:
+    if: github.repository == 'Atheon42/EDT-Pages.github.io'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned open-source extractor
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL --retry 2 --max-time 25 'https://github.com/Bwkyd/url-md/releases/download/v0.2.0/url-md-x86_64-unknown-linux-gnu.tar.gz' -o /tmp/url-md.tgz
+          echo 'cc2cf64ce4b6a9d832c822ff29280f252eb2892bd8cefe04ec0b52374b86c2b2  /tmp/url-md.tgz' | sha256sum -c -
+          mkdir -p /tmp/url-md
+          tar -xzf /tmp/url-md.tgz -C /tmp/url-md
+          find /tmp/url-md -name url-md -type f -exec chmod +x {} \;
+      - name: Download and validate article and images
+        shell: bash
+        run: |
+          set -euo pipefail
+          BIN="$(find /tmp/url-md -name url-md -type f | head -1)"
+          test -x "$BIN"
+          python3 wechat-reader/worker.py wechat-reader/request.json "$BIN" /tmp/verified-wechat 65
+      - name: Transfer verified article to ChatGPT connector
+        uses: actions/upload-artifact@v4
+        with:
+          name: wechat-${{ github.sha }}
+          path: /tmp/verified-wechat/
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 6
