@@ -27,7 +27,6 @@ jobs:
           echo "EXIT_CODE=$ec"
           echo "OUTPUT_FILES=$(find /tmp/full-article -type f | wc -l)"
           echo "MARKDOWN_FILES=$(find /tmp/full-article -type f -name '*.md' | wc -l)"
-          echo "IMAGE_FILES=$(find /tmp/full-article -type f \\( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.gif' -o -iname '*.webp' \\) | wc -l)"
           python3 - <<'PY'
           from pathlib import Path
           docs=list(Path('/tmp/full-article').rglob('*.md'))
@@ -37,6 +36,7 @@ jobs:
           print('MARKDOWN_BYTES',len(text.encode()))
           for x in anchors:print('PHRASE_MATCH',x, x in text)
           print('IMAGE_MARKDOWN_LINKS',text.count('!['))
+          print('IMAGE_FILES', sum(1 for p in Path('/tmp/full-article').rglob('*') if p.is_file() and p.suffix.lower() in ('.png','.jpg','.jpeg','.gif','.webp')))
           print('HAS_REAL_IMAGES', bool(list(Path('/tmp/full-article').rglob('*.png')) or list(Path('/tmp/full-article').rglob('*.jpeg')) or list(Path('/tmp/full-article').rglob('*.jpg'))))
           print('FULL_TEXT_ANCHORS_OK',all(x in text for x in anchors))
           PY
