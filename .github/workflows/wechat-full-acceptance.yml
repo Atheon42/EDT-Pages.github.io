@@ -42,3 +42,10 @@ jobs:
           PY
           echo "STDERR_SNIPPET=$(head -c 300 /tmp/error.log | tr '\\n' ' ')"
           test "$ec" -eq 0
+      - name: Preserve verified test output for end-to-end transfer
+        uses: actions/upload-artifact@v4
+        with:
+          name: wechat-article-pictures
+          path: /tmp/full-article/
+          if-no-files-found: error
+          retention-days: 1
