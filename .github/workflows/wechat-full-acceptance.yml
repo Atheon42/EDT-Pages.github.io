@@ -1,0 +1,44 @@
+name: Atheon WeChat Reader full article and image acceptance
+on:
+  push:
+    branches: [test/wechat-reader-network-20261016]
+    paths: ['.github/workflows/wechat-full-acceptance.yml']
+permissions:
+  contents: read
+jobs:
+  article-qa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Full article and original image retrieval test
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL --max-time 20 'https://github.com/Bwkyd/url-md/releases/download/v0.2.0/url-md-x86_64-unknown-linux-gnu.tar.gz' -o /tmp/reader.tgz
+          echo 'cc2cf64ce4b6a9d832c822ff29280f252eb2892bd8cefe04ec0b52374b86c2b2  /tmp/reader.tgz' | sha256sum -c -
+          mkdir -p /tmp/urlmd /tmp/full-article
+          tar -xzf /tmp/reader.tgz -C /tmp/urlmd
+          BIN=$(find /tmp/urlmd -type f -name url-md | head -1)
+          chmod +x "$BIN"
+          set +e
+          timeout 55 "$BIN" 'https://mp.weixin.qq.com/s/xj_nxuvM5l05D4uCLpCvRQ' -o /tmp/full-article >/tmp/output.log 2>/tmp/error.log
+          ec=$?
+          set -e
+          echo "EXIT_CODE=$ec"
+          echo "OUTPUT_FILES=$(find /tmp/full-article -type f | wc -l)"
+          echo "MARKDOWN_FILES=$(find /tmp/full-article -type f -name '*.md' | wc -l)"
+          echo "IMAGE_FILES=$(find /tmp/full-article -type f \\( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.gif' -o -iname '*.webp' \\) | wc -l)"
+          python3 - <<'PY'
+          from pathlib import Path
+          docs=list(Path('/tmp/full-article').rglob('*.md'))
+          if not docs: raise SystemExit('NO_MARKDOWN')
+          text=docs[0].read_text()
+          anchors=['中国人民银行行长潘功胜出席新兴市场研讨会','全球投资者对多元分散配置','1200多家境外投资者','推动人民币债券成为全球广泛认可和使用']
+          print('MARKDOWN_BYTES',len(text.encode()))
+          for x in anchors:print('PHRASE_MATCH',x, x in text)
+          print('IMAGE_MARKDOWN_LINKS',text.count('!['))
+          print('HAS_REAL_IMAGES', bool(list(Path('/tmp/full-article').rglob('*.png')) or list(Path('/tmp/full-article').rglob('*.jpeg')) or list(Path('/tmp/full-article').rglob('*.jpg'))))
+          print('FULL_TEXT_ANCHORS_OK',all(x in text for x in anchors))
+          PY
+          echo "STDERR_SNIPPET=$(head -c 300 /tmp/error.log | tr '\\n' ' ')"
+          test "$ec" -eq 0
